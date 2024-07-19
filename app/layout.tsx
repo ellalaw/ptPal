@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+// this line above instead of import Head from 'next/head'
 import { Inter } from "next/font/google";
 import "./globals.css";
 
