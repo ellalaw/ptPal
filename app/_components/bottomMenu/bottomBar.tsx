@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 //import { useRouter } from 'next/router'
+import styles from './bottomMenu.module.css'
 
 export default function BottomBar() {
     //const router = useRouter();
@@ -12,16 +13,16 @@ export default function BottomBar() {
         return (
             <Link
                 href={route}
-                className="basis-1/2"
+                className={`${colorClass} ${styles.menu_box} text-center basis-1/2 hover:bg-indigo-500`}
             >
-                <div className={`${colorClass} h-14 text-center hover:bg-indigo-500`}>{name}</div>
+                <div className={`${styles.menu_text}`}>{name}</div>
             </Link>
         )
     }
 
     return (
         <>
-            <div className="h-1/5 flex flex-row">
+            <div className={`${styles.bottom_height} flex flex-row`}>
                 <MenuItem name="Home" route="/a1" />&nbsp;
                 <MenuItem name="Planner" route="/a2" />&nbsp;
                 <MenuItem name="Me" route="/a3" />

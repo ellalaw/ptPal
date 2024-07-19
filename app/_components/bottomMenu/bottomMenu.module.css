@@ -1,0 +1,23 @@
+.content_container {
+  text-decoration: underline;
+}
+.content_height {
+  height: 92%;
+}
+.bottom_height {
+  height: 8%;
+}
+.menu_box {
+  /*height: 100%;
+  width: 100%;
+  border: 2px solid red;*/
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+}
+.menu_text {
+  font-weight: bold;
+  /*margin: auto;
+  display: block;*/
+}
