@@ -22,7 +22,7 @@ export default function BottomBar() {
 
     return (
         <>
-            <div className={`${styles.bottom_height} flex flex-row`}>
+            <div className={`${styles.bottom_height} h-[10%] flex flex-row`}>
                 <MenuItem name="Home" route="/a1" />&nbsp;
                 <MenuItem name="Planner" route="/a2" />&nbsp;
                 <MenuItem name="Me" route="/a3" />

@@ -1,5 +1,7 @@
+@tailwind components;
+
 .content_container {
-  text-decoration: underline;
+  /*text-decoration: underline;*/
 }
 .content_height {
   height: 92%;
@@ -20,4 +22,10 @@
   font-weight: bold;
   /*margin: auto;
   display: block;*/
+}
+
+@layer components {
+  .content_style {
+    @apply mt-5 tracking-normal underline bg-clip-content p-6 bg-violet-300 border-4 border-violet-300 border-dashed;
+  }
 }
