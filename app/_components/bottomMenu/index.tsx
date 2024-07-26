@@ -18,7 +18,7 @@ export default function BottomMenu({ pageTitle, children }) {
     //console.log("aaa: " + titleConcat);
     let abc = generatePageTitle(titleConcat);
     //abc = abc.title;
-    console.log("aaa: " + abc.title);
+    //console.log("bottomMenu index: " + abc.title);
     return (
         <div className="flex flex-col flex-grow w-screen h-screen">
             {children}
