@@ -4,7 +4,8 @@ import BottomMenuComponent from '@components/BottomMenuComponent'
 
 async function getData() {
     // fake user profile infomation
-    const user = await fetch(`${process.env.BASE_URL}/user-profile/api`)
+    const user = await fetch(`${process.env.BASE_URL}` + '/user-profile/api', { cache: 'no-store' })
+    //const user = await fetch(`${process.env.BASE_URL}` + '/api/user-profile', { cache: 'no-store' })
     return user.json()
 }
 
