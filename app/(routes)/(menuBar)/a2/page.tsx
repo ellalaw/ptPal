@@ -16,8 +16,8 @@ export default function ContactPage() {
     async function loadModel() {
         const model = poseDetection.SupportedModels.MoveNet;
         const detectorConfig = {modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING};
-        const detector = await poseDetection.createDetector(model, detectorConfig);
-        setDetector(detector);
+        const de = await poseDetection.createDetector(model, detectorConfig);
+        setDetector(de);
     }
 
     useEffect(() => {
@@ -31,7 +31,6 @@ export default function ContactPage() {
                 videoElement.onloadeddata = () => {
                     videoElement.play();
                 };
-
             }).catch((error) => {
                 if (error.name === 'NotAllowedError') {
                   console.error('user rejected camera');
@@ -53,9 +52,14 @@ export default function ContactPage() {
 
     const drawKeypoints = (ctx, poses, threshold = 0.2) => {
         poses.forEach((pose) => {
-            console.log(pose);
+            //const aa = poseDetection.calculators.keypointsToNormalizedKeypoints(pose.keypoints, {width: 640, height: 480})
+            //console.log(pose.keypoints);
             pose.keypoints.forEach((keypoint) => {
-                const { x, y, score } = keypoint;
+                const { x, y, score, name } = keypoint;
+//                 if (name === 'left_wrist') {
+//                     console.log(x, y, score)
+//                     const leftHip = keypoint;
+//                 }
                 if (score > threshold) {
                     ctx.beginPath();
                     ctx.arc(x, y, 5, 0, 2 * Math.PI);
@@ -88,12 +92,13 @@ export default function ContactPage() {
         if (detector) {
             const interval = setInterval(async () => {
                 const videoElement = videoRef.current;
-                if (videoElement.readyState === 4) {
+                if (videoElement && videoElement.readyState === 4) {
                     const poses = await detector.estimatePoses(videoElement);
-                    console.log(poses);
+                    //console.log(poses);
                     const canvas = canvasRef.current;
                     const ctx = canvas.getContext('2d');
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    //resetCenter(poses);
                     drawKeypoints(ctx, poses);
                     drawSkeleton(ctx, poses);
                 }
@@ -104,7 +109,7 @@ export default function ContactPage() {
 
     return (
         <BottomMenuComponent title="Planner Page">
-            <div className="flex">
+            <div className="flex float-left">
                 <canvas ref={canvasRef} width="640" height="480"></canvas>
             </div>
             {isCameraOn ? (

@@ -12,7 +12,6 @@ export default function BottomMenuComponent({ title, children }) {
                     {children}
                     <div className="mt-5 tracking-normal underline bg-clip-content p-6 bg-violet-300 border-4 border-violet-300 border-dashed">paragraph a</div>
                     <div className={`${styles.content_style}`}>paragraph b</div>
-                    <div className={`${styles.content_style}`}>paragraph c</div>
                 </div>
             </div>
         </BottomMenu>
