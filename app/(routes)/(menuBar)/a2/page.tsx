@@ -14,7 +14,7 @@ export default function ContactPage() {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const imageRef = useRef(null);
-    //const [standarPoses, setStandarPoses] = useState(null);
+    const [standarHip, setStandarHip] = useState(null);
     const [adjustStandarKeypoints, setAdjustStandarKeypoints] = useState(null);
     const [isCameraOn, setCamerabtnStatus] = useState(false);
     const [detector, setDetector] = useState(null);
@@ -63,8 +63,6 @@ export default function ContactPage() {
 
     const drawKeypoints = (ctx, poses, threshold = 0.2) => {
         poses.forEach((pose) => {
-            //const aa = poseDetection.calculators.keypointsToNormalizedKeypoints(pose.keypoints, {width: 640, height: 480})
-            //console.log(pose.keypoints);
             pose.keypoints.forEach((keypoint) => {
                 const { x, y, score, name } = keypoint;
                 if (score > threshold) {
@@ -104,9 +102,11 @@ export default function ContactPage() {
                 const shoulderDistance = getShoulderDistance(standarPoses[0].keypoints);
                 const [hipDistance, leftHip, rightHip] = getHipDistance(standarPoses[0].keypoints);
                 const scale = hipDistance; // or shoulderDistance
+                setStandarHip(hipDistance);
                 const centerX = (leftHip.x + rightHip.x) / 2;
                 const centerY = (leftHip.y + rightHip.y) / 2;
-                console.log(centerY, centerX);
+                //console.log(shoulderDistance, hipDistance);
+                //console.log(centerY, centerX);
                 const result = standarPoses[0].keypoints.map(({y, x, score, name}) => {
                     return {
                         y: (y - centerY), // scale by hipDistance, divide by scale not used
@@ -115,7 +115,9 @@ export default function ContactPage() {
                         name: name
                     };
                 });
+                //console.log(result);
                 const aa = poseDetection.calculators.keypointsToNormalizedKeypoints(result, {width: 640, height: 480})
+                //console.log(aa);
                 setAdjustStandarKeypoints(aa);
             }
             scanStandar();
@@ -169,19 +171,23 @@ export default function ContactPage() {
         }
         const shoulderDistance = getShoulderDistance(poses[0].keypoints);
         const [hipDistance, leftHip, rightHip] = getHipDistance(poses[0].keypoints);
-        const scale = hipDistance; // or shoulderDistance
+        //const scale = hipDistance; // or shoulderDistance
+        const scale = standarHip ? hipDistance / standarHip : 1;
+        //console.log("scale:", scale, hipDistance, standarHip);
         const centerX = (leftHip.x + rightHip.x) / 2;
         const centerY = (leftHip.y + rightHip.y) / 2;
         //console.log(centerY, centerX);
         const adjustedKeypoints = poses[0].keypoints.map(({y, x, score, name}) => {
             return {
-                y: (y - centerY), // scale by hipDistance
-                x: (x - centerX), // offset by center
+                y: (y - centerY) / scale, // scale by hipDistance, divide by scale not used
+                x: (x - centerX) / scale, // offset by center
                 score: score,
                 name: name
             };
         });
+        //console.log(adjustedKeypoints);
         const aa = poseDetection.calculators.keypointsToNormalizedKeypoints(adjustedKeypoints, {width: 640, height: 480})
+        //console.log(aa);
 
         if (adjustStandarKeypoints) {
             //console.log("standar: ", adjustStandarKeypoints[9]);
@@ -190,7 +196,7 @@ export default function ContactPage() {
             const averageDistance = distances.reduce(
                 (accumulator, currentValue) => accumulator + currentValue, 0) / distances.length;
             //console.log(averageDistance);
-            setProgress((1 - averageDistance + 0.05) * 100);
+            setProgress((1 - averageDistance) * 100);
         }
     }
 
