@@ -1,8 +1,11 @@
 'use client'
 import React from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react';
 //import DummyPage from '../../../_components/DummyPage'
-import BottomMenuComponent from '@components/BottomMenuComponent'
+import BottomMenuComponent from '@components/BottomMenuComponent';
+import ProgressBar from '@components/ProgressBar';
+import styles from '@styles/a2.module.css';
+
 import * as poseDetection from '@tensorflow-models/pose-detection';
 //import * as tf from '@tensorflow/tfjs-core';
 import '@tensorflow/tfjs-backend-webgl';
@@ -15,6 +18,7 @@ export default function ContactPage() {
     const [adjustStandarKeypoints, setAdjustStandarKeypoints] = useState(null);
     const [isCameraOn, setCamerabtnStatus] = useState(false);
     const [detector, setDetector] = useState(null);
+    const [progress, setProgress] = useState(0);
 
     async function loadModel() {
         const model = poseDetection.SupportedModels.MoveNet;
@@ -105,7 +109,7 @@ export default function ContactPage() {
                 console.log(centerY, centerX);
                 const result = standarPoses[0].keypoints.map(({y, x, score, name}) => {
                     return {
-                        y: (y - centerY), // scale by hipDistance
+                        y: (y - centerY), // scale by hipDistance, divide by scale not used
                         x: (x - centerX), // offset by center
                         score: score,
                         name: name
@@ -160,6 +164,9 @@ export default function ContactPage() {
     }
 
     function compareWithStandar(poses) {
+        if (poses.length === 0) {
+            return;
+        }
         const shoulderDistance = getShoulderDistance(poses[0].keypoints);
         const [hipDistance, leftHip, rightHip] = getHipDistance(poses[0].keypoints);
         const scale = hipDistance; // or shoulderDistance
@@ -175,13 +182,15 @@ export default function ContactPage() {
             };
         });
         const aa = poseDetection.calculators.keypointsToNormalizedKeypoints(adjustedKeypoints, {width: 640, height: 480})
-        //console.log(aa[9]);
 
         if (adjustStandarKeypoints) {
             //console.log("standar: ", adjustStandarKeypoints[9]);
             const distances = aa.map((p1, index) => keypointsDistance(p1, adjustStandarKeypoints[index]));
-            const averageDistance = distances.reduce((a, b) => a+b, 0) / distances.length;
-            console.log(averageDistance);
+            console.log(distances);
+            const averageDistance = distances.reduce(
+                (accumulator, currentValue) => accumulator + currentValue, 0) / distances.length;
+            //console.log(averageDistance);
+            setProgress((1 - averageDistance + 0.05) * 100);
         }
     }
 
@@ -193,22 +202,26 @@ export default function ContactPage() {
 
     return (
         <BottomMenuComponent title="Planner Page">
-            <img className="" ref={imageRef} src="/standar.jpg" width="640" height="480"></img>
-            <div className="flex float-left">
-                <canvas ref={canvasRef} width="640" height="480"></canvas>
-            </div>
-            {isCameraOn ? (
-                <div className="flex">
-                    <video ref={videoRef} autoPlay playsInline className="left" width="640" height="480"></video>
+            <div className={`${styles.h_480}`}>
+                <img className="flex float-left mr-3 ml-3" ref={imageRef} src="/standar.jpg" width="640" height="480"></img>
+                <div className="flex flex-col" style={{width: 640}}>
+                    <h1 className="text-3xl font-bold mb-4 h-24">Completion</h1>
+                    <ProgressBar progress={progress} />
+                    <p className="mt-4">{progress}%</p>
                 </div>
-            ) : (
-                <div></div>
-            )}
-            <button className="bg-blue-300 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-full"
-                onClick={() => setCamerabtnStatus(!isCameraOn)}>
-                {isCameraOn ? 'Turn Off Camera' : 'Turn On Camera'}
-            </button>
-
+            </div>
+            <div className={`${styles.h_480}`}>
+                <canvas className={`${styles.canvas_bg} float-left mx-3`} ref={canvasRef} width="640" height="480"></canvas>
+                {isCameraOn ? (
+                <video ref={videoRef} autoPlay playsInline className="float-left" width="640" height="480"></video>
+                ) : (
+                <div className="float-left center" style={{width: 640}}>video</div>
+                )}
+                <button className="bg-blue-300 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-full"
+                    onClick={() => setCamerabtnStatus(!isCameraOn)}>
+                    {isCameraOn ? 'Turn Off Camera' : 'Turn On Camera'}
+                </button>
+            </div>
         </BottomMenuComponent>
     )
 }
