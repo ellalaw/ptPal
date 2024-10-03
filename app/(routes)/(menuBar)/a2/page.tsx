@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import BottomMenuComponent from '@components/BottomMenuComponent';
 import ProgressBar from '@components/ProgressBar';
 import styles from '@styles/a2.module.css';
-
+import {drawAngleOnCanvas, drawKeypoints, drawSkeleton} from '@utility/drawing';
 import * as poseDetection from '@tensorflow-models/pose-detection';
 //import * as tf from '@tensorflow/tfjs-core';
 import '@tensorflow/tfjs-backend-webgl';
@@ -61,38 +61,6 @@ export default function ContactPage() {
         //return () => {};
     }, [isCameraOn]);
 
-    const drawKeypoints = (ctx, poses, threshold = 0.2) => {
-        poses.forEach((pose) => {
-            pose.keypoints.forEach((keypoint) => {
-                const { x, y, score, name } = keypoint;
-                if (score > threshold) {
-                    ctx.beginPath();
-                    ctx.arc(x, y, 5, 0, 2 * Math.PI);
-                    ctx.fillStyle = 'red';
-                    ctx.fill();
-                }
-            });
-        });
-    };
-
-    const drawSkeleton = (ctx, poses, threshold = 0.2) => {
-        const adjacentKeyPoints = poseDetection.util.getAdjacentPairs(poseDetection.SupportedModels.MoveNet);
-        poses.forEach((pose) => {
-            adjacentKeyPoints.forEach(([i, j]) => {
-                const keypoint1 = pose.keypoints[i];
-                const keypoint2 = pose.keypoints[j];
-                if (keypoint1.score > threshold && keypoint2.score > threshold) {
-                    ctx.beginPath();
-                    ctx.moveTo(keypoint1.x, keypoint1.y);
-                    ctx.lineTo(keypoint2.x, keypoint2.y);
-                    ctx.strokeStyle = 'green';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                }
-            });
-        })
-    };
-
     useEffect(() => {
         if (detector) {
             async function scanStandar () {
@@ -119,6 +87,12 @@ export default function ContactPage() {
                 const aa = poseDetection.calculators.keypointsToNormalizedKeypoints(result, {width: 640, height: 480})
                 //console.log(aa);
                 setAdjustStandarKeypoints(aa);
+
+                const rightShoulder = getKeyPointInfo(standarPoses[0].keypoints, 6, 'right_shoulder');
+                const rightElbow = getKeyPointInfo(standarPoses[0].keypoints, 8, 'right_elbow');
+                const rightWrist = getKeyPointInfo(standarPoses[0].keypoints, 10, 'right_wrist');
+                const shoulderAngle = getKeypointAngle(rightShoulder, rightElbow, rightWrist);
+                console.log(shoulderAngle);
             }
             scanStandar();
         }
@@ -129,13 +103,25 @@ export default function ContactPage() {
             const interval = setInterval(async () => {
                 const videoElement = videoRef.current;
                 if (videoElement && videoElement.readyState === 4) {
-                    const poses = await detector.estimatePoses(videoElement);
-                    const canvas = canvasRef.current;
-                    const ctx = canvas.getContext('2d');
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    compareWithStandar(poses);
-                    drawKeypoints(ctx, poses);
-                    drawSkeleton(ctx, poses);
+                    try {
+                        const poses = await detector.estimatePoses(videoElement);
+                        const canvas = canvasRef.current;
+                        const ctx = canvas.getContext('2d');
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        compareWithStandar(poses);
+                        drawKeypoints(ctx, poses);
+                        const adjacentKeyPoints = poseDetection.util.getAdjacentPairs(poseDetection.SupportedModels.MoveNet);
+                        drawSkeleton(ctx, poses, adjacentKeyPoints);
+
+                        const rightShoulder = getKeyPointInfo(poses[0].keypoints, 6, 'right_shoulder');
+                        const rightElbow = getKeyPointInfo(poses[0].keypoints, 8, 'right_elbow');
+                        const rightWrist = getKeyPointInfo(poses[0].keypoints, 10, 'right_wrist');
+                        const shoulderAngle = getKeypointAngle(rightShoulder, rightElbow, rightWrist);
+                        //console.log(shoulderAngle);
+                        drawAngleOnCanvas(ctx, rightShoulder, rightElbow, rightWrist, shoulderAngle);
+                    }  catch (error) {
+                        console.log(error);
+                    }
                 }
             }, 1000);
             return () => {
@@ -192,12 +178,34 @@ export default function ContactPage() {
         if (adjustStandarKeypoints) {
             //console.log("standar: ", adjustStandarKeypoints[9]);
             const distances = aa.map((p1, index) => keypointsDistance(p1, adjustStandarKeypoints[index]));
-            console.log(distances);
+            //console.log(distances);
             const averageDistance = distances.reduce(
                 (accumulator, currentValue) => accumulator + currentValue, 0) / distances.length;
             //console.log(averageDistance);
+            const rightShoulder = getKeyPointInfo(poses[0].keypoints, 6, 'right_shoulder');
+            const rightElbow = getKeyPointInfo(poses[0].keypoints, 8, 'right_elbow');
+            const rightWrist = getKeyPointInfo(poses[0].keypoints, 10, 'right_wrist');
+            const shoulderAngle = getKeypointAngle(rightShoulder, rightElbow, rightWrist);
+            //console.log(shoulderAngle);
+
             setProgress((1 - averageDistance) * 100);
         }
+    }
+
+    function getKeyPointInfo(keypoints, index, name) {
+        const kp = keypoints[index].name === name ? keypoints[index] : keypoints.find(point => point.name === name);
+        return kp
+    }
+
+    function getKeypointAngle(p1, p2, p3) {
+        // 2PI = 360, 1弧度 = 180/PI
+        //console.log(Math.atan2(p3.y - p2.y, p3.x - p2.x));
+        //console.log(Math.atan2(p1.y - p2.y, p1.x - p2.x));
+        //console.log(p3.y - p2.y, p3.x - p2.x);
+        //console.log(p1.y - p2.y, p1.x - p2.x);
+
+        const angle = Math.atan2(p3.y - p2.y, p3.x - p2.x) - Math.atan2(p1.y - p2.y, p1.x - p2.x);
+        return Math.abs(angle * 180.0 / Math.PI);
     }
 
     function compareUpperBody(userPoses) {
@@ -211,7 +219,7 @@ export default function ContactPage() {
             <div className={`${styles.h_480}`}>
                 <img className="flex float-left mr-3 ml-3" ref={imageRef} src="/standar.jpg" width="640" height="480"></img>
                 <div className="flex flex-col" style={{width: 640}}>
-                    <h1 className="text-3xl font-bold mb-4 h-24">Completion</h1>
+                    <h1 className="text-3xl font-bold mb-60 h-24">Completion</h1>
                     <ProgressBar progress={progress} />
                     <p className="mt-4">{progress}%</p>
                 </div>

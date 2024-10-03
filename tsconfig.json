@@ -21,7 +21,8 @@
     "paths": {
       //"@/*": ["./*"]
       "@components/*": ["_components/*"],
-      "@styles/*": ["_styles/*"]
+      "@styles/*": ["_styles/*"],
+      "@utility/*": ["_utility/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

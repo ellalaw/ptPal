@@ -1,9 +1,35 @@
 @tailwind components;
 
 .canvas_bg {
-  border: 1px solid yellow;
+    border: 1px solid yellow;
+}
+
+@layer components {
+  .box_bg {
+    /*@apply mt-5 tracking-normal underline bg-clip-content p-6 bg-violet-300 border-4 border-violet-300 border-dashed;*/
+    @apply border-violet-300 border-dashed;
+    border-width: 1px;
+    width: 642px;
+    height: 482px;
+  }
+}
+
+.video_trans {
+    /*transform: scaleX(-1);*/
+}
+
+.display_center {
+    display: flex;
+    align: center;
+    justify-content: center;
 }
 
 .h_480 {
     height: 480px;
+}
+
+.clearfix::after {
+    content: "";
+    display: table;
+    clear: both;
 }
