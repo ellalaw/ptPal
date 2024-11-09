@@ -85,6 +85,8 @@ export default function AboutUsPage() {
                 if (videoElement && videoElement.readyState === 4) {
                     try {
                         const poses = await detector.estimatePoses(videoElement);
+                        if (poses.length === 0) return;
+                        //threeDOutput(poses);
                         const canvas = canvasRef.current;
                         const ctx = canvas.getContext('2d');
                         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -137,6 +139,11 @@ export default function AboutUsPage() {
         //console.log(Math.abs(standarKneeAngle - kneeAngle) / 360);
         setHipProgress((1 - Math.abs(standarHipAngle - hipAngle) / 360) * 100);
         setKneeProgress((1 - Math.abs(standarKneeAngle - kneeAngle) / 360) * 100);
+    }
+
+    function threeDOutput(poses) {
+        const keypoints = poses[0].keypoints.map(kp => [kp.x, kp.y]);
+        console.log(keypoints);
     }
 
     return (

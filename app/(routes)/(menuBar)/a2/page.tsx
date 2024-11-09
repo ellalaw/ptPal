@@ -6,8 +6,15 @@ import BottomMenuComponent from '@components/BottomMenuComponent';
 import ProgressBar from '@components/ProgressBar';
 import styles from '@styles/a2.module.css';
 import {drawAngleOnCanvas, drawKeypoints, drawSkeleton} from '@utility/drawing';
+import { Canvas } from '@react-three/fiber';
+import { mesh } from 'three';
+import { useFrame } from '@react-three/fiber';
+//import { OrbitControls } from '@react-three/drei';
+import { Line } from '@react-three/drei';
+import * as THREE from 'three';
 import * as poseDetection from '@tensorflow-models/pose-detection';
-//import * as tf from '@tensorflow/tfjs-core';
+import * as tf from '@tensorflow/tfjs';
+import * as tfc from '@tensorflow/tfjs-converter';
 import '@tensorflow/tfjs-backend-webgl';
 
 export default function ContactPage() {
@@ -18,7 +25,10 @@ export default function ContactPage() {
     const [adjustStandarKeypoints, setAdjustStandarKeypoints] = useState(null);
     const [isCameraOn, setCamerabtnStatus] = useState(false);
     const [detector, setDetector] = useState(null);
+    const [graphModel, setGraphModel] = useState(null);
     const [progress, setProgress] = useState(0);
+    const [keypoints3D, setKeypoints3D] = useState([]);
+    const [twoDFrames, setTwoDFrames] = useState([]);
 
     async function loadModel() {
         const model = poseDetection.SupportedModels.MoveNet;
@@ -26,9 +36,8 @@ export default function ContactPage() {
         const de = await poseDetection.createDetector(model, detectorConfig);
         setDetector(de);
 
-//         const imgElement = imageRef.current;
-//         const result = await de.estimatePoses(imgElement);
-//         setStandarPoses(result);
+        const model2 = await tfc.loadGraphModel('/models/model.json');
+        setGraphModel(model2);
     }
 
     useEffect(() => {
@@ -105,6 +114,7 @@ export default function ContactPage() {
                 if (videoElement && videoElement.readyState === 4) {
                     try {
                         const poses = await detector.estimatePoses(videoElement);
+                        if (poses.length === 0) return;
                         const canvas = canvasRef.current;
                         const ctx = canvas.getContext('2d');
                         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -119,6 +129,8 @@ export default function ContactPage() {
                         const shoulderAngle = getKeypointAngle(rightShoulder, rightElbow, rightWrist);
                         //console.log(shoulderAngle);
                         drawAngleOnCanvas(ctx, rightShoulder, rightElbow, rightWrist, shoulderAngle);
+
+                        composeKeypoints2(poses);
                     }  catch (error) {
                         console.log(error);
                     }
@@ -129,7 +141,186 @@ export default function ContactPage() {
                 console.log("clear");
             }
         }
-    }, [detector, adjustStandarKeypoints]);
+    }, [detector, adjustStandarKeypoints, graphModel]);
+
+//     useEffect(() => {
+//         console.log(twoDFrames.length);
+//         if (twoDFrames.length === 243) {
+//             runInference(twoDFrames);
+//             //setTwoDFrames([]);
+//             clearList();
+//         }
+//     }, [twoDFrames.length === 243]);
+
+    function clearList() {
+        setTwoDFrames([]);
+    }
+
+    function composeKeypoints(poses) {
+//         const keypoints2D = poses.map(pose =>
+//           pose.keypoints.map(k => [k.x, k.y])
+//         );
+        const frames = [];
+        //console.log(poses[0].keypoints);
+        for (let i = 0; i < 243; i++) {
+            const keypoints2D = poses[0].keypoints.map(k => [k.x, k.y]);
+            frames.push(keypoints2D);
+        }
+        const frames2 = [];
+        poses[0].keypoints.map(({y, x, score, name}) => {
+            frames2.push([x, y]);
+        })
+        //console.log(frames);
+        runInference(frames2);
+    }
+
+    async function runInference(frames) {
+        //const inputTensor = tf.tensor(frames, [1, 17, 2, 243]);
+        //const paddedData = tf.pad(tf.tensor(poses), [[0, 8261]]);
+        const inputTensor = tf.tensor(frames)//.transpose([1, 2, 0]);
+        console.log(inputTensor.arraySync());
+        //const reshapeTensor = inputTensor.reshape([1, 17, 2, 243]);
+        const reshapeTensor = inputTensor.reshape([1, 17, 2, 243]);
+
+        if (reshapeTensor !== null) {
+            console.log(reshapeTensor.arraySync());
+            const outputTensor = graphModel.execute({ 'onnx____reshape_0': reshapeTensor });
+            //const outputTensor = graphModel.execute(reshapeTensor);
+            //outputTensor.print();
+            const outputArray = outputTensor.arraySync();
+
+            console.log(outputArray[0][0]);
+            setKeypoints3D(outputArray[0][0]);
+        }
+    }
+
+    async function aa(keypoints2D) {
+        const inputTensor = tf.tensor(keypoints2D).transpose([1, 2, 0]);
+        const reshapeTensor = inputTensor.reshape([1, 17, 2, 243]);
+
+        if (reshapeTensor !== null) {
+            const outputTensor = graphModel.predict(reshapeTensor);
+            const outputArray = outputTensor.arraySync();
+            console.log(outputArray[0][0][0]);
+        }
+    }
+    async function bb(keypoints2D) {
+        const inputTensor = tf.tensor(keypoints2D).transpose([1, 2, 0]);
+        const reshapeTensor = inputTensor.reshape([1, 17, 2, 243]);
+
+        if (reshapeTensor !== null) {
+            const outputTensor = graphModel.execute({ 'onnx____reshape_0': reshapeTensor });
+            const outputArray = outputTensor.arraySync();
+            console.log(outputArray[0][0][0]);
+        }
+    }
+
+    function composeKeypoints2(poses) {
+        console.log(poses[0].keypoints);
+        //const cc = poseDetection.calculators.keypointsToNormalizedKeypoints(poses[0].keypoints, {width: 640, height: 480})
+        const aa = poses[0].keypoints.map(({y, x, score, name}) => ({
+            x: (x / 640) * 2 - 1,
+            y: (1 - (y / 480)) * 2 - 1,
+            z: 0
+        }));
+        console.log(aa);
+//         const bb = cc.map(key => ({
+//             x: (key.x + 1) * (640 / 2),
+//             y: (1 - key.y) * (480 / 2),
+//             z: 0
+//         }));
+
+        const bb = poses[0].keypoints.map(({y, x, score, name}) => ({
+            x: x - 320,
+            y: -(y - 240),
+            z: 0
+        }));
+
+        const frames = [];
+        aa.map(({x, y, z}) => {
+            //frames.push([x, y, Math.random() * -2]);
+            frames.push([x, y, 0]);
+        });
+//         bb.map(({x, y, z}) => {
+//             frames.push([x, y, Math.random() * -2]);
+//         });
+        console.log(frames);
+        setKeypoints3D(frames);
+        //runInference2(frames);
+    }
+
+    async function runInference2(frames) {
+        const inputTensor = tf.tensor(frames);
+        const outputTensor = graphModel.execute({ 'onnx____reshape_0': inputTensor });
+        const outputArray = outputTensor.arraySync();
+        console.log(outputArray[0][0]);
+    }
+
+    function DrawPoint3D({ keypoints3D }) {
+        console.log(keypoints3D);
+        if (!keypoints3D || keypoints3D.length === 0) return null;
+        //const [keypoints, setKeypoints] = useState([]);
+
+//         useEffect(() => {
+//             setKeypoints(keypoints3D);
+//         }, [keypoints3D]);
+
+
+//        useFrame(() => {
+//             setKeypoints(prevKeypoints =>
+//                 prevKeypoints.map((point, index) => {
+//                     return [
+//                         keypoints3D[index].x,
+//                         keypoints3D[index].y,
+//                         keypoints3D[index].z,
+//                     ];
+//                 })
+//             );
+//            setKeypoints(keypoints3D));
+//        });
+        return keypoints3D.map((keypoint, index) => (
+            <mesh key={index} position={keypoint}>
+              <sphereGeometry args={[0.03, 16, 16]} />
+              <meshStandardMaterial color="red" />
+            </mesh>
+        ));
+    }
+
+    function DrawSkeleton3D({ keypoints3D }) {
+        console.log(keypoints3D);
+        console.log(!!window.WebGLRenderingContext && !!document.createElement('canvas').getContext('webgl'));
+        if (!keypoints3D || keypoints3D.length === 0) return null;
+        const adjacentKeyPoints = poseDetection.util.getAdjacentPairs(poseDetection.SupportedModels.MoveNet);
+        console.log(adjacentKeyPoints);
+        return adjacentKeyPoints.map(([i, j], index) => {
+            const keypoint1 = keypoints3D[i];
+            const keypoint2 = keypoints3D[j];
+            const points = [new THREE.Vector3(keypoint1[0], keypoint1[1], keypoint1[2]),
+                            new THREE.Vector3(keypoint2[0], keypoint2[1], keypoint2[2])];
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            return (
+                <Line
+                    key={index}
+                    points={[keypoint1, keypoint2]}
+                    color="red"
+                    lineWidth={1}
+                />
+
+//                 <lineSegments key={index} geometry={geometry}>
+//                     <lineBasicMaterial attach="material" color="orange" linewidth={1} />
+//                 </lineSegments>
+            )
+        });
+
+    }
+
+//     async function convertTo3D(poses) {
+//       const keypoints2D = poses[0].keypoints;
+//       const inputTensor = tf.tensor(keypoints2D).expandDims(0);  // 形状为 (1, N, 17, 2)
+//       const outputTensor = graphModel.predict(inputTensor);  // 输出为 3D 关键点
+//       const keypoints3D = outputTensor.arraySync();  // 转换为 JS 数组
+//       return keypoints3D[0];  // 3D 关键点
+//     }
 
     function getShoulderDistance(keypoints) {
         const leftShoulder = keypoints[5].name === 'left_shoulder' ? keypoints[5] : keypoints.find(point => point.name === 'left_shoulder');
@@ -214,6 +405,32 @@ export default function ContactPage() {
     function compareLowerBody(userPoses) {
     }
 
+    function Box() {
+      const meshRef = useRef();
+      useFrame(() => {
+        if (meshRef.current) {
+          meshRef.current.rotation.x += 0.01;
+          meshRef.current.rotation.y += 0.01;
+        }
+      });
+
+      return (
+        <mesh ref={meshRef} position={[0, 0, 0]}>
+          {/* 立方体的几何结构 */}
+          <boxGeometry args={[1, 1, 1]} />
+          {/* 立方体的材质 */}
+          <meshStandardMaterial color="orange" />
+        </mesh>
+      );
+    }
+    function Ground() {
+      return (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]}>
+          <planeGeometry args={[10, 10]} />
+          <meshStandardMaterial color="lightgreen" />
+        </mesh>
+      );
+    }
     return (
         <BottomMenuComponent title="Planner Page">
             <div className={`${styles.h_480}`}>
@@ -224,6 +441,27 @@ export default function ContactPage() {
                     <p className="mt-4">{progress}%</p>
                 </div>
             </div>
+            <div className={`${styles.h_480}`}>
+                {/*<Canvas orthographic camera={{ zoom: 200, position: [0, 0, 5] }}>*/}
+                <Canvas orthographic camera={{ zoom: 200, position: [0, 0, 5], fov: 75 }}>
+                    <color attach="background" args={['#777777']} />
+                    <ambientLight intensity={0.5} />
+                    <directionalLight position={[10, 10, 5]} intensity={1} />
+                    <pointLight position={[10, 10, 10]} />
+                    <DrawPoint3D keypoints3D={keypoints3D} />
+                    <DrawSkeleton3D keypoints3D={keypoints3D} />
+                </Canvas>
+            </div>
+            {/*<div className={`${styles.h_480}`}>
+                <Canvas camera={{ position: [320, 240, 500] }}>
+                    <color attach="background" args={['#1a1a2e']} />
+                    <ambientLight intensity={0.5} />
+                    <directionalLight position={[10, 10, 5]} intensity={1} />
+                    <pointLight position={[10, 10, 10]} />
+                    <DrawPoint3D keypoints3D={keypoints3D} />
+                    <DrawSkeleton3D keypoints3D={keypoints3D} />
+                </Canvas>
+            </div>*/}
             <div className={`${styles.h_480}`}>
                 <canvas className={`${styles.canvas_bg} float-left mx-3`} ref={canvasRef} width="640" height="480"></canvas>
                 {isCameraOn ? (

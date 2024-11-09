@@ -87,7 +87,7 @@ export function drawAngleOnCanvas(ctx, pointA, pointB, pointC, angle) {
     ctx.fillText(`${Math.round(angle)}°`, textX, textY); // 绘制角度值
 };
 
-export function drawKeypoints(ctx, poses, threshold = 0.2) {
+export function drawKeypoints(ctx, poses, threshold = 0.3) {
     poses.forEach((pose) => {
         pose.keypoints.forEach((keypoint) => {
             const { x, y, score, name } = keypoint;
@@ -101,7 +101,7 @@ export function drawKeypoints(ctx, poses, threshold = 0.2) {
     });
 };
 
-export function drawSkeleton(ctx, poses, adjacentKeyPoints, threshold = 0.2) {
+export function drawSkeleton(ctx, poses, adjacentKeyPoints, threshold = 0.3) {
     poses.forEach((pose) => {
         adjacentKeyPoints.forEach(([i, j]) => {
             const keypoint1 = pose.keypoints[i];
