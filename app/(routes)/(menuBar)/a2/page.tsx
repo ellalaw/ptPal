@@ -29,6 +29,8 @@ export default function ContactPage() {
     const [progress, setProgress] = useState(0);
     const [keypoints3D, setKeypoints3D] = useState([]);
     const [twoDFrames, setTwoDFrames] = useState([]);
+    //const [frames243, setFrames243] = useState([]);
+    const frames243 = [];
 
     async function loadModel() {
         const model = poseDetection.SupportedModels.MoveNet;
@@ -36,7 +38,8 @@ export default function ContactPage() {
         const de = await poseDetection.createDetector(model, detectorConfig);
         setDetector(de);
 
-        const model2 = await tfc.loadGraphModel('/models/model.json');
+        //const model2 = await tfc.loadGraphModel('/models/videopose3d-humaneva15/model.json');
+        const model2 = await tfc.loadGraphModel('/models/videopose3d-h36m/model.json');
         setGraphModel(model2);
     }
 
@@ -135,22 +138,13 @@ export default function ContactPage() {
                         console.log(error);
                     }
                 }
-            }, 1000);
+            }, 100);
             return () => {
                 clearInterval(interval);
                 console.log("clear");
             }
         }
     }, [detector, adjustStandarKeypoints, graphModel]);
-
-//     useEffect(() => {
-//         console.log(twoDFrames.length);
-//         if (twoDFrames.length === 243) {
-//             runInference(twoDFrames);
-//             //setTwoDFrames([]);
-//             clearList();
-//         }
-//     }, [twoDFrames.length === 243]);
 
     function clearList() {
         setTwoDFrames([]);
@@ -231,33 +225,128 @@ export default function ContactPage() {
 //         }));
 
         const bb = poses[0].keypoints.map(({y, x, score, name}) => ({
-            x: x - 320,
-            y: -(y - 240),
+            x: x / 640,
+            y: - y / 480,
             z: 0
         }));
 
         const frames = [];
         aa.map(({x, y, z}) => {
             //frames.push([x, y, Math.random() * -2]);
-            frames.push([x, y, 0]);
+            frames.push([x, y]);
         });
 //         bb.map(({x, y, z}) => {
 //             frames.push([x, y, Math.random() * -2]);
 //         });
-        console.log(frames);
-        setKeypoints3D(frames);
-        //runInference2(frames);
+        //console.log(frames);
+        const inputFrames = Coco2Human36m(frames);
+        const frames243_1 = [];
+        for (let i = 0; i < 243; i++) {
+            frames243_1.push(inputFrames);
+        }
+        runInference2(frames243_1);
+
+//         if (frames243.length === 243) {
+//             runInference2(frames243);
+//             frames243.shift();
+//         } else {
+//             frames243.push(frames);
+//         }
+        console.log('after run');
+    }
+
+    function Coco2Human36m(cocoKeypoints) {
+        const mhip = [(cocoKeypoints[11][0] + cocoKeypoints[12][0]) / 2, (cocoKeypoints[11][1] + cocoKeypoints[12][1]) / 2];
+        const thorax = [(cocoKeypoints[5][0] + cocoKeypoints[6][0]) / 2, (cocoKeypoints[5][1] + cocoKeypoints[6][1]) / 2];;
+        const spine = [(mhip[0] + thorax[0]) / 2, (mhip[1] + thorax[1]) / 2];
+        const head = [(cocoKeypoints[1][0] + cocoKeypoints[2][0]) / 2, (cocoKeypoints[1][1] + cocoKeypoints[2][1]) / 2];;
+        const human36mKeypoints = [
+            mhip,
+            cocoKeypoints[12],
+            cocoKeypoints[14],
+            cocoKeypoints[16],
+            cocoKeypoints[11],
+            cocoKeypoints[13],
+            cocoKeypoints[15],
+            spine,
+            thorax,
+            cocoKeypoints[0],
+            head,
+            cocoKeypoints[5],
+            cocoKeypoints[7],
+            cocoKeypoints[9],
+            cocoKeypoints[6],
+            cocoKeypoints[8],
+            cocoKeypoints[10]
+        ];
+
+        return human36mKeypoints;
     }
 
     async function runInference2(frames) {
-        const inputTensor = tf.tensor(frames);
-        const outputTensor = graphModel.execute({ 'onnx____reshape_0': inputTensor });
-        const outputArray = outputTensor.arraySync();
-        console.log(outputArray[0][0]);
+        const inputTensor = tf.tensor(frames).transpose([1, 2, 0]);
+        //console.log(inputTensor.arraySync());
+        //const reshapeTensor = inputTensor.expandDims(0);
+        const reshapeTensor = inputTensor.reshape([1, 17, 2, 243]);
+        //console.log(reshapeTensor.arraySync());
+        try {
+            const outputTensor = graphModel.execute({ 'onnx____reshape_0': reshapeTensor });
+            const outputArray = outputTensor.arraySync();
+            console.log(outputArray[0][0]);
+            const finalkp = mapKeypointsH36m(outputArray[0][0]);
+            //const finalkp = mapKeypointsHumaneva15(outputArray[0][0]);
+            console.log(finalkp);
+            setKeypoints3D(finalkp);
+        } catch (error) {
+            console.error('Error during model execution:', error);
+        }
+    }
+
+    function mapKeypointsHumaneva15(videoPose3DKeypoints) {
+        const mappedKeypoints = new Array(17).fill([0, 0, 0]);
+        mappedKeypoints[5] = videoPose3DKeypoints[3];  // 左肩
+        mappedKeypoints[6] = videoPose3DKeypoints[4];  // 右肩
+        mappedKeypoints[7] = videoPose3DKeypoints[5];  // 左肘
+        mappedKeypoints[8] = videoPose3DKeypoints[6];  // 右肘
+        mappedKeypoints[9] = videoPose3DKeypoints[7];  // 左手腕
+        mappedKeypoints[10] = videoPose3DKeypoints[8]; // 右手腕
+        mappedKeypoints[11] = videoPose3DKeypoints[9]; // 左髋
+        mappedKeypoints[12] = videoPose3DKeypoints[10]; // 右髋
+        mappedKeypoints[13] = videoPose3DKeypoints[11]; // 左膝盖
+        mappedKeypoints[14] = videoPose3DKeypoints[12]; // 右膝盖
+        mappedKeypoints[15] = videoPose3DKeypoints[13]; // 左脚踝
+        mappedKeypoints[16] = videoPose3DKeypoints[14]; // 右脚踝
+        const neck = [
+            (videoPose3DKeypoints[3][0] + videoPose3DKeypoints[4][0]) / 2,
+            (videoPose3DKeypoints[3][1] + videoPose3DKeypoints[4][1]) / 2,
+            (videoPose3DKeypoints[3][2] + videoPose3DKeypoints[4][2]) / 2,
+        ];
+        mappedKeypoints[0] = neck;
+        return mappedKeypoints;
+    }
+
+    function mapKeypointsH36m(human36mKeypoints) {
+        //return videoPose3DKeypoints;
+        const cocoKeypoints = new Array(17).fill([0, 0, 0]);
+        cocoKeypoints[0] = human36mKeypoints[9]; // 鼻子
+        cocoKeypoints[5] = human36mKeypoints[11]; // 左肩
+        cocoKeypoints[6] = human36mKeypoints[14]; // 右肩
+        cocoKeypoints[7] = human36mKeypoints[12]; // 左肘
+        cocoKeypoints[8] = human36mKeypoints[15]; // 右肘
+        cocoKeypoints[9] = human36mKeypoints[13]; // 左手腕
+        cocoKeypoints[10] = human36mKeypoints[16]; // 右手腕
+        cocoKeypoints[11] = human36mKeypoints[4]; // 左髋
+        cocoKeypoints[12] = human36mKeypoints[1]; // 右髋
+        cocoKeypoints[13] = human36mKeypoints[5]; // 左膝
+        cocoKeypoints[14] = human36mKeypoints[2]; // 右膝
+        cocoKeypoints[15] = human36mKeypoints[6]; // 左脚踝
+        cocoKeypoints[16] = human36mKeypoints[3]; // 右脚踝
+
+        return cocoKeypoints;
     }
 
     function DrawPoint3D({ keypoints3D }) {
-        console.log(keypoints3D);
+        //console.log(keypoints3D);
         if (!keypoints3D || keypoints3D.length === 0) return null;
         //const [keypoints, setKeypoints] = useState([]);
 
@@ -287,12 +376,33 @@ export default function ContactPage() {
     }
 
     function DrawSkeleton3D({ keypoints3D }) {
-        console.log(keypoints3D);
-        console.log(!!window.WebGLRenderingContext && !!document.createElement('canvas').getContext('webgl'));
+        //console.log(keypoints3D);
+        //console.log(!!window.WebGLRenderingContext && !!document.createElement('canvas').getContext('webgl'));
         if (!keypoints3D || keypoints3D.length === 0) return null;
-        const adjacentKeyPoints = poseDetection.util.getAdjacentPairs(poseDetection.SupportedModels.MoveNet);
-        console.log(adjacentKeyPoints);
-        return adjacentKeyPoints.map(([i, j], index) => {
+        const adjacentKeyPoints36 = poseDetection.util.getAdjacentPairs(poseDetection.SupportedModels.MoveNet);
+//         const adjacentKeyPoints36 = [
+//             //[5, 6],
+//             //[5, 7],
+//             //[5, 11],
+//             [12, 14],
+//             [14, 16],
+//         ];
+        //const adjacentKeyPoints15 = [];
+//         const adjacentKeyPoints = [
+//             [5, 6],
+//             [5, 7],
+//             [5, 11],
+//             [6, 8],
+//             [6, 12],
+//             [7, 9],
+//             [8, 10],
+//             [11, 12],
+//             [11, 13],
+//             [12, 14],
+//             [13, 15],
+//             [14, 16]
+//         ];
+        return adjacentKeyPoints36.map(([i, j], index) => {
             const keypoint1 = keypoints3D[i];
             const keypoint2 = keypoints3D[j];
             const points = [new THREE.Vector3(keypoint1[0], keypoint1[1], keypoint1[2]),
@@ -443,7 +553,7 @@ export default function ContactPage() {
             </div>
             <div className={`${styles.h_480}`}>
                 {/*<Canvas orthographic camera={{ zoom: 200, position: [0, 0, 5] }}>*/}
-                <Canvas orthographic camera={{ zoom: 200, position: [0, 0, 5], fov: 75 }}>
+                <Canvas orthographic camera={{zoom: 200, position: [0, 0, 5], fov:60 }}>
                     <color attach="background" args={['#777777']} />
                     <ambientLight intensity={0.5} />
                     <directionalLight position={[10, 10, 5]} intensity={1} />
